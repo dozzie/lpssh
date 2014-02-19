@@ -1,0 +1,6 @@
+{application, lpssh, [
+  {description, ""},
+  {vsn, "0.0.1"},
+  {registered, []},
+  {applications, [kernel, stdlib, ssh]}
+]}.
