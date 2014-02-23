@@ -31,6 +31,7 @@
 %%%---------------------------------------------------------------------------
 
 %% @doc Execute command on remote host.
+%%   Complex command (list of strings) is simply joined with spaces.
 %%
 %%   SSH port defaults to 22.
 %%
@@ -41,6 +42,7 @@ execute(Host, Command, Opts) ->
   execute(Host, default, Command, Opts).
 
 %% @doc Execute command on remote host.
+%%   Complex command (list of strings) is simply joined with spaces.
 %%
 %%   SSH port defaults to 22.
 %%
@@ -49,8 +51,26 @@ execute(Host, Command, Opts) ->
 
 execute(Host, default, Command, Opts) ->
   execute(Host, 22, Command, Opts);
-execute(_Host, _Port, _Command, _Opts) ->
-  'TODO'.
+execute(Host, Port, [C | _Rest] = Command, Opts) when is_list(C) ->
+  execute(Host, Port, string:join(Command, " "), Opts);
+execute(Host, Port, Command, Opts) ->
+  case ssh_connect(Host, Port, Opts) of
+    {ok, Conn} ->
+      Result = ssh_execute(Conn, Command, Opts),
+      ssh_disconnect(Conn),
+      case Result of
+        {error, _Reason} = Error ->
+          Error;
+        unknown ->
+          {error,unknown};
+        {exit,_Code} = Result ->
+          {ok, Result};
+        {signal,_SigName} = Result ->
+          {ok, Result}
+      end;
+    {error, _Reason} = Error ->
+      Error
+  end.
 
 %%%---------------------------------------------------------------------------
 %%% SSH convenience wrappers
@@ -92,7 +112,7 @@ ssh_disconnect({{_Host, _Port}, ConnRef} = _SSHConnRef) ->
 %%
 %% @see print_line/3
 %%
-%% @spec ssh_execute(ssh_conn_ref(), gen_lpssh_call:command(), optlist()) ->
+%% @spec ssh_execute(ssh_conn_ref(), string(), optlist()) ->
 %%   {exit, integer()} | {signal, string()} | unknown | {error, Reason}
 
 ssh_execute({{_Host, _Port}, ConnRef} = SSHConnRef, Command, _Opts) ->
