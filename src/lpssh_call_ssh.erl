@@ -12,6 +12,9 @@
 %% gen_lpssh_call API
 -export([execute/3, execute/4]).
 
+%% SSH convenience wrappers (maybe somebody will find it useful)
+-export([ssh_connect/3, ssh_disconnect/1, ssh_execute/3]).
+
 %%%---------------------------------------------------------------------------
 
 %% @type optlist() = [{Key :: atom(), Value :: term()} | atom()].
@@ -50,7 +53,7 @@ execute(_Host, _Port, _Command, _Opts) ->
   'TODO'.
 
 %%%---------------------------------------------------------------------------
-%%% internal functions
+%%% SSH convenience wrappers
 %%%---------------------------------------------------------------------------
 
 %% @doc Connect to remote host.
@@ -81,15 +84,32 @@ ssh_connect(Host, Port, _Opts) ->
 ssh_disconnect({{_Host, _Port}, ConnRef} = _SSHConnRef) ->
   ssh:close(ConnRef).
 
+%% @doc Execute a command on specified connection.
+%%   All the output from command is printed to standard output (that is, to
+%%   group leader).
+%%
+%%   Function returns how the remote command exited.
+%%
+%% @see print_line/3
+%%
+%% @spec ssh_execute(ssh_conn_ref(), gen_lpssh_call:command(), optlist()) ->
+%%   {exit, integer()} | {signal, string()} | unknown | {error, Reason}
+
 ssh_execute({{_Host, _Port}, ConnRef} = SSHConnRef, Command, _Opts) ->
   SSHTimeout = 5000, % 5000ms % TODO: retrieve timeout from Opts
   % TODO: error handling ({ok, Channel} | {error, Reason})
   {ok, Channel} = ssh_connection:session_channel(ConnRef, SSHTimeout),
   % TODO: error handling (success | failure)
   success = ssh_connection:exec(ConnRef, Channel, Command, SSHTimeout),
-  % TODO: read exit code
   ssh_read_output(SSHConnRef, Channel, fun print_line/3),
-  ok.
+  ssh_read_exit(SSHConnRef, Channel, unknown).
+
+%% @doc Read output from command and print it to standard output.
+%%
+%% @see print_line/3
+%%
+%% @spec ssh_read_output(ssh_conn_ref(), integer(), fun()) ->
+%%   ok
 
 ssh_read_output({{Host, Port}, ConnRef} = SSHConnRef, Channel, PrintLine) ->
   receive
@@ -98,19 +118,32 @@ ssh_read_output({{Host, Port}, ConnRef} = SSHConnRef, Channel, PrintLine) ->
         Line <- binary:split(Data, <<"\n">>, [global, trim])],
       ssh_read_output(SSHConnRef, Channel, PrintLine);
     {ssh_cm, ConnRef, {eof, Channel}} ->
-      % TODO: wait for exit_signal or exit_status
-      % {ssh_cm, ConnRef,
-      %   {exit_signal, Channel, ExitSignal :: string(), _ErrorMsg, _Lang}}
-      % {ssh_cm, ConnRef,
-      %   {exit_status, Channel, ExitStatus :: integer()}}
-      % {ssh_cm, ConnRef, {closed, Channel}}
-      % after ... -> unknown
-      %
-      % {exit, ExitStatus}
-      % {signal, ExitSignal}
-      % unknown
       ok
   end.
+
+%% @doc Read exit status of the command (signal or exit).
+%%
+%% @spec ssh_read_exit(ssh_conn_ref(), integer(), term()) ->
+%%   {exit, integer()} | {signal, string()} | unknown | {error, Reason}
+
+ssh_read_exit({{_Host, _Port}, ConnRef} = SSHConnRef, Channel, Result) ->
+  receive
+    {ssh_cm, ConnRef, {exit_signal, Channel, ExitSignal, _ErrorMsg, _Lang}} ->
+      % ExitSignal :: string()
+      ssh_read_exit(SSHConnRef, Channel, {signal, ExitSignal});
+    {ssh_cm, ConnRef, {exit_status, Channel, ExitStatus}} ->
+      % ExitStatus :: integer()
+      ssh_read_exit(SSHConnRef, Channel, {exit, ExitStatus});
+    {ssh_cm, ConnRef, {closed, Channel}} ->
+      Result
+  after 1000 ->
+      {error, timeout}
+  end.
+
+%% @doc Print line to standard output.
+%%
+%% @spec print_line(string(), integer(), string() | binary()) ->
+%%   ok
 
 print_line(Host, _Port, Line) ->
   io:fwrite("[~s]> ~s~n", [Host, Line]).
