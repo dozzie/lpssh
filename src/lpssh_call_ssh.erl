@@ -9,10 +9,22 @@
 -module(lpssh_call_ssh).
 -behaviour(gen_lpssh_call).
 
--export([]).
+%% gen_lpssh_call API
+-export([execute/3, execute/4]).
 
 %%%---------------------------------------------------------------------------
+%%% gen_lpssh_call API
+%%%---------------------------------------------------------------------------
 
+execute(Host, Command, Opts) ->
+  execute(Host, default, Command, Opts).
+
+execute(_Host, _Port, _Command, _Opts) ->
+  'TODO'.
+
+%%%---------------------------------------------------------------------------
+%%% internal functions
+%%%---------------------------------------------------------------------------
 
 %%%---------------------------------------------------------------------------
 %%% vim:ft=erlang:foldmethod=marker
