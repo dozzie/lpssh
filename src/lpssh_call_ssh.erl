@@ -117,12 +117,18 @@ ssh_disconnect({{_Host, _Port}, ConnRef} = _SSHConnRef) ->
 
 ssh_execute({{_Host, _Port}, ConnRef} = SSHConnRef, Command, _Opts) ->
   SSHTimeout = 5000, % 5000ms % TODO: retrieve timeout from Opts
-  % TODO: error handling ({ok, Channel} | {error, Reason})
-  {ok, Channel} = ssh_connection:session_channel(ConnRef, SSHTimeout),
-  % TODO: error handling (success | failure)
-  success = ssh_connection:exec(ConnRef, Channel, Command, SSHTimeout),
-  ssh_read_output(SSHConnRef, Channel, fun print_line/3),
-  ssh_read_exit(SSHConnRef, Channel, unknown).
+  case ssh_connection:session_channel(ConnRef, SSHTimeout) of
+    {ok, Channel} ->
+      case ssh_connection:exec(ConnRef, Channel, Command, SSHTimeout) of
+        success ->
+          ssh_read_output(SSHConnRef, Channel, fun print_line/3),
+          ssh_read_exit(SSHConnRef, Channel, unknown);
+        failure ->
+          {error, ssh_exec_failure}
+      end;
+    {error, _Reason} = Error ->
+      Error
+  end.
 
 %% @doc Read output from command and print it to standard output.
 %%
