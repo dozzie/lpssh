@@ -23,8 +23,8 @@
 %% @spec private_host_dsa_key(system | user | {remoteuser, User}, list()) ->
 %%   {ok, SSHKey} | {error, Reason}
 
-private_host_dsa_key(_Type, _Opts) ->
-  'TODO'.
+private_host_dsa_key(Type, Opts) ->
+  ssh_file:private_host_dsa_key(Type, Opts).
 
 %% @doc Load user's private RSA key for authentication.
 %%   Typically, the key is stored in `~/.ssh/id_rsa' file.
@@ -32,8 +32,8 @@ private_host_dsa_key(_Type, _Opts) ->
 %% @spec private_host_rsa_key(system | user | {remoteuser, User}, list()) ->
 %%   {ok, SSHKey} | {error, Reason}
 
-private_host_rsa_key(_Type, _Opts) ->
-  'TODO'.
+private_host_rsa_key(Type, Opts) ->
+  ssh_file:private_host_rsa_key(Type, Opts).
 
 %%%---------------------------------------------------------------------------
 %%% hosts' public key management
@@ -46,15 +46,15 @@ private_host_rsa_key(_Type, _Opts) ->
 %% @spec lookup_host_key(string(), string(), list()) ->
 %%   {ok, SSHKey :: term()} | {error, Reason}
 
-lookup_host_key(_Host, _Alg, _Opts) ->
-  'TODO'.
+lookup_host_key(Host, Alg, Opts) ->
+  ssh_file:lookup_host_key(Host, Alg, Opts).
 
 %% @doc Add host's public key to `known_hosts' file.
 %% @spec add_host_key(string(), term(), list()) ->
 %%   ok | {error, Reason}
 
-add_host_key(_Host, _Key, _Opts) ->
-  'TODO'.
+add_host_key(Host, Key, Opts) ->
+  ssh_file:add_host_key(Host, Key, Opts).
 
 %%%---------------------------------------------------------------------------
 %%% vim:ft=erlang:foldmethod=marker
