@@ -12,7 +12,8 @@
 
 %% @doc Behaviour description.
 behaviour_info(callbacks = _Aspect) ->
-  [];
+  [{hosts, 1}, {hosts, 2}, {format_error, 1},
+    {dependencies, 0}, {init, 1}, {terminate, 1}];
 behaviour_info(_Aspect) ->
   undefined.
 
