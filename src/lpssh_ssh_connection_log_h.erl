@@ -6,7 +6,7 @@
 %%% @end
 %%%---------------------------------------------------------------------------
 
--module(lpssh_connection_log_h).
+-module(lpssh_ssh_connection_log_h).
 
 -behaviour(gen_event).
 

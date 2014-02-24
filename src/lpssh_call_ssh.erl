@@ -50,9 +50,9 @@ dependencies() ->
 init(_Args) ->
   % error reports from gen_fsm (e.g. "password required" error) should not go
   % to terminal; instead, they should be nicely formatted by
-  % `lpssh_connection_log_h'
+  % `lpssh_ssh_connection_log_h'
   error_logger:tty(false),
-  error_logger:add_report_handler(lpssh_connection_log_h, group_leader()),
+  error_logger:add_report_handler(lpssh_ssh_connection_log_h, group_leader()),
   {ok, nostate}.
 
 %% @doc Clean up on shutdown.
@@ -103,7 +103,7 @@ execute(Host, Port, Command, Opts) ->
       end;
     {error, Reason} when is_list(Reason) ->
       % messy error report as a string (iolist); leave the error to be printed
-      % by lpssh_connection_log_h
+      % by `lpssh_ssh_connection_log_h'
       skip_error;
     {error, normal} ->
       % connection abruptly closed by the server
