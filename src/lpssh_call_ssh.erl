@@ -1,8 +1,6 @@
 %%%---------------------------------------------------------------------------
 %%% @doc
 %%%   SSH remote call module.
-%%%
-%%% @see lpssh_keyfile
 %%% @end
 %%%---------------------------------------------------------------------------
 
@@ -10,8 +8,7 @@
 -behaviour(gen_lpssh_call).
 
 %% gen_lpssh_call API
--export([execute/3, execute/4]).
-%% gen_lpssh_call future API
+-export([execute/4, execute/5]).
 -export([dependencies/0, init/1, terminate/1]).
 -export([format_error/1]).
 
@@ -28,6 +25,9 @@
 
 %% @type ssh_conn_ref() =
 %%   {{Host :: hostname(), Port :: portnum()}, SSHConnRef :: term()}.
+
+%% @type exec_result() =
+%%   {exit, Code :: integer()} | {signal, Name :: string()}.
 
 %%%---------------------------------------------------------------------------
 %%% gen_lpssh_call API
@@ -68,25 +68,32 @@ terminate(nostate = _State) ->
 %%
 %%   SSH port defaults to 22.
 %%
-%% @spec execute(hostname(), gen_lpssh_call:command(), optlist()) ->
-%%   {ok, ssh_conn_ref()} | skip_error | {error, Reason}
+%% @see init/1
+%% @see terminate/1
+%%
+%% @spec execute(hostname(), gen_lpssh_call:command(), optlist(), term()) ->
+%%   {ok, exec_result()} | skip_error | {error, Reason}
 
-execute(Host, Command, Opts) ->
-  execute(Host, default, Command, Opts).
+execute(Host, Command, Opts, State) ->
+  execute(Host, default, Command, Opts, State).
 
 %% @doc Execute command on remote host.
 %%   Complex command (list of strings) is simply joined with spaces.
 %%
 %%   SSH port defaults to 22.
 %%
-%% @spec execute(hostname(), portnum(), gen_lpssh_call:command(), optlist()) ->
-%%   {ok, ssh_conn_ref()} | skip_error | {error, Reason}
+%% @see init/1
+%% @see terminate/1
+%%
+%% @spec execute(hostname(), portnum(), gen_lpssh_call:command(),
+%%               optlist(), term()) ->
+%%   {ok, exec_result()} | skip_error | {error, Reason}
 
-execute(Host, default, Command, Opts) ->
-  execute(Host, 22, Command, Opts);
-execute(Host, Port, [C | _Rest] = Command, Opts) when is_list(C) ->
-  execute(Host, Port, string:join(Command, " "), Opts);
-execute(Host, Port, Command, Opts) ->
+execute(Host, default, Command, Opts, State) ->
+  execute(Host, 22, Command, Opts, State);
+execute(Host, Port, [C | _Rest] = Command, Opts, State) when is_list(C) ->
+  execute(Host, Port, string:join(Command, " "), Opts, State);
+execute(Host, Port, Command, Opts, nostate = _State) ->
   case ssh_connect(Host, Port, Opts) of
     {ok, Conn} ->
       ExecResult = ssh_execute(Conn, Command, Opts),
@@ -95,7 +102,7 @@ execute(Host, Port, Command, Opts) ->
         {error, _Reason} = Error ->
           Error;
         unknown ->
-          {error,unknown};
+          {error, unknown};
         {exit, _Code} ->
           {ok, ExecResult};
         {signal, _SigName} ->

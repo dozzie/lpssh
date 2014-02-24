@@ -1,8 +1,11 @@
 %%%---------------------------------------------------------------------------
 %%% @doc
-%%%   Callback module for key handling. This module is responsible for loading
-%%%   private RSA/DSA key, finding host's public key and adding host's key to
-%%%   known hosts list.
+%%%   Callback module for SSH key handling. This module is responsible for
+%%%   loading private RSA/DSA key, finding host's public key and adding host's
+%%%   key to known hosts list.
+%%%
+%%% @see lpssh_call_ssh
+%%%
 %%% @end
 %%%---------------------------------------------------------------------------
 

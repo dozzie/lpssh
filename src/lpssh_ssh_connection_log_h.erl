@@ -3,6 +3,9 @@
 %%%   {@link error_logger} log handler to catch errors in outgoing SSH
 %%%   connections. Module mitigates some problems with error reporting in
 %%%   Erlang's SSH library.
+%%%
+%%% @see lpssh_call_ssh
+%%%
 %%% @end
 %%%---------------------------------------------------------------------------
 
