@@ -11,6 +11,9 @@
 
 %% gen_lpssh_call API
 -export([execute/3, execute/4]).
+%% gen_lpssh_call future API
+-export([dependencies/0, init/1, terminate/1]).
+-export([format_error/1]).
 
 %% SSH convenience wrappers (maybe somebody will find it useful)
 -export([ssh_connect/3, ssh_disconnect/1, ssh_execute/3]).
@@ -30,13 +33,43 @@
 %%% gen_lpssh_call API
 %%%---------------------------------------------------------------------------
 
+%% @doc Return list of applications that need to be started to use this
+%%   module.
+%%
+%% @spec dependencies() ->
+%%   [atom()]
+
+dependencies() ->
+  [ssh].
+
+%% @doc Setup environment for SSH client.
+%%
+%% @spec init(term()) ->
+%%   {ok, State} | {error, Reason}
+
+init(_Args) ->
+  % error reports from gen_fsm (e.g. "password required" error) should not go
+  % to terminal; instead, they should be nicely formatted by
+  % `lpssh_connection_log_h'
+  error_logger:tty(false),
+  error_logger:add_report_handler(lpssh_connection_log_h, group_leader()),
+  {ok, nostate}.
+
+%% @doc Clean up on shutdown.
+%%
+%% @spec terminate(term()) ->
+%%   any()
+
+terminate(nostate = _State) ->
+  ok.
+
 %% @doc Execute command on remote host.
 %%   Complex command (list of strings) is simply joined with spaces.
 %%
 %%   SSH port defaults to 22.
 %%
 %% @spec execute(hostname(), gen_lpssh_call:command(), optlist()) ->
-%%   {ok, ssh_conn_ref()} | {error, Reason}
+%%   {ok, ssh_conn_ref()} | skip_error | {error, Reason}
 
 execute(Host, Command, Opts) ->
   execute(Host, default, Command, Opts).
@@ -47,7 +80,7 @@ execute(Host, Command, Opts) ->
 %%   SSH port defaults to 22.
 %%
 %% @spec execute(hostname(), portnum(), gen_lpssh_call:command(), optlist()) ->
-%%   {ok, ssh_conn_ref()} | {error, Reason}
+%%   {ok, ssh_conn_ref()} | skip_error | {error, Reason}
 
 execute(Host, default, Command, Opts) ->
   execute(Host, 22, Command, Opts);
@@ -56,21 +89,60 @@ execute(Host, Port, [C | _Rest] = Command, Opts) when is_list(C) ->
 execute(Host, Port, Command, Opts) ->
   case ssh_connect(Host, Port, Opts) of
     {ok, Conn} ->
-      Result = ssh_execute(Conn, Command, Opts),
+      ExecResult = ssh_execute(Conn, Command, Opts),
       ssh_disconnect(Conn),
-      case Result of
+      case ExecResult of
         {error, _Reason} = Error ->
           Error;
         unknown ->
           {error,unknown};
-        {exit,_Code} = Result ->
-          {ok, Result};
-        {signal,_SigName} = Result ->
-          {ok, Result}
+        {exit, _Code} ->
+          {ok, ExecResult};
+        {signal, _SigName} ->
+          {ok, ExecResult}
       end;
+    {error, Reason} when is_list(Reason) ->
+      % messy error report as a string (iolist); leave the error to be printed
+      % by lpssh_connection_log_h
+      skip_error;
+    {error, normal} ->
+      % connection abruptly closed by the server
+      {error, connection_closed};
+    {error, {'EXIT',_}} ->
+      {error, operational_error};
     {error, _Reason} = Error ->
       Error
   end.
+
+%% @doc Return description of an error returned by {@link execute/4}.
+%%
+%% @spec format_error({error,term()} | term()) ->
+%%   string()
+
+format_error({error,Reason} = _Error) ->
+  format_error(Reason);
+format_error(unknown) ->
+  "exec result unknown";
+format_error(skip) ->
+  "(messy error; printed by `error_logger' handler)";
+format_error(connection_closed) ->
+  "connection abruptly closed by the server";
+format_error(emfile) ->
+  "too many open files";
+format_error(operational_error) ->
+  "operational error (too many open files?)";
+format_error(econnrefused) ->
+  "connection refused";
+format_error(etimedout) ->
+  "connection timeout";
+format_error(nxdomain) ->
+  "unknown host";
+format_error(ehostunreach) ->
+  "host unreachable";
+format_error(enetunreach) ->
+  "network unreachable";
+format_error(_) ->
+  "(unrecognized error)".
 
 %%%---------------------------------------------------------------------------
 %%% SSH convenience wrappers
