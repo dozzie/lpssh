@@ -59,6 +59,7 @@ init(_Args) ->
 %%   any()
 
 terminate(nostate = _State) ->
+  error_logger:delete_report_handler(lpssh_ssh_connection_log_h),
   ok.
 
 %% @doc Execute command on remote host.
