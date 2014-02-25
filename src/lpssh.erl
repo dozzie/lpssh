@@ -168,10 +168,16 @@ receive_results([]) ->
   [];
 receive_results([{Host, {Pid, MonRef}} | Rest] = _Children) ->
   receive
+    {result, Pid, skip_error, _} ->
+      erlang:demonitor(MonRef, [flush]),
+      % don't report this error, the report was already sent
+      [{Host, skip_error, skip_error} | receive_results(Rest)];
     {result, Pid, ExitType, Result} ->
       erlang:demonitor(MonRef, [flush]),
+      error_logger:info_report(lpssh_call_result, {Host, ExitType, Result}),
       [{Host, ExitType, Result} | receive_results(Rest)];
     {'DOWN', MonRef, _Type, Pid, ExitReason} ->
+      error_logger:info_report(lpssh_call_result, {Host, died, ExitReason}),
       [{Host, died, ExitReason} | receive_results(Rest)]
   end.
 

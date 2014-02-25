@@ -18,7 +18,7 @@
 -export([handle_event/2, handle_call/2, handle_info/2]).
 -export([code_change/3]).
 
--record(opts, {iodev}).
+-record(opts, {}).
 
 %%%---------------------------------------------------------------------------
 %%% gen_event callbacks
@@ -26,11 +26,11 @@
 
 %% @doc Initialize event handler.
 %%
-%% @spec init(term()) ->
+%% @spec init(any()) ->
 %%   {ok, term()}
 
-init(IODev) ->
-  {ok, #opts{iodev = IODev}}.
+init(_Args) ->
+  {ok, #opts{}}.
 
 %% @doc Clean up after event handler.
 terminate(_Arg, _Opts) ->
@@ -42,11 +42,22 @@ terminate(_Arg, _Opts) ->
 handle_event({error, _GL,
                {_Pid, "** State machine ~p terminating" ++ _ = _Fmt,
                  [_StateM, _LastMsg, _State, Data, ExitReason]}} = _Event,
-             Opts = #opts{iodev = IODev}) ->
+             Opts = #opts{}) ->
   % it's sort of a hack: I'm just sure the OTP (gen_fsm) will send a message
   % in this format
   FSMOpts = element(size(Data), Data),
-  print_report(IODev, FSMOpts, ExitReason),
+
+  Host = proplists:get_value(address, FSMOpts),
+  %Port = proplists:get_value(port, FSMOpts),
+  %User = proplists:get_value(user, FSMOpts),
+
+  case ExitReason of
+    {bad_return_value,{no_io_allowed,read_password}} ->
+      error_logger:info_report(lpssh_call_result,
+                               {Host, error, password_required});
+    _ ->
+      error_logger:info_report(lpssh_call_result, {Host, died, ExitReason})
+  end,
   {ok, Opts};
 
 handle_event(_Event, Opts) ->
@@ -64,22 +75,6 @@ handle_info(_Message, Opts) ->
 %% @doc Handle code change.
 code_change(_OldVsn, Opts, _Extra) ->
   {ok, Opts}.
-
-%%%---------------------------------------------------------------------------
-
-print_report(IODev, FSMOpts, ExitReason) ->
-  Host = proplists:get_value(address, FSMOpts),
-  %Port = proplists:get_value(port, FSMOpts),
-  %User = proplists:get_value(user, FSMOpts),
-  case ExitReason of
-    {bad_return_value,{no_io_allowed,read_password}} ->
-      io:fwrite(IODev, "connecting to ~p failed: password required~n",
-                [Host]);
-    _ ->
-      io:fwrite(IODev, "connecting to ~p failed: ~1024p~n",
-                [Host, ExitReason])
-  end,
-  ok.
 
 %%%---------------------------------------------------------------------------
 %%% vim:ft=erlang:foldmethod=marker
