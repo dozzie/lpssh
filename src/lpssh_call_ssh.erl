@@ -8,7 +8,7 @@
 -behaviour(gen_lpssh_call).
 
 %% gen_lpssh_call API
--export([execute/4, execute/5]).
+-export([execute/4]).
 -export([dependencies/0, init/1, terminate/1]).
 -export([format_error/1]).
 
@@ -21,10 +21,8 @@
 
 %% @type hostname() = string() | inet:ip_address().
 
-%% @type portnum() = integer() | default.
-
 %% @type ssh_conn_ref() =
-%%   {{Host :: hostname(), Port :: portnum()}, SSHConnRef :: term()}.
+%%   {{Host :: hostname(), Port :: integer()}, SSHConnRef :: term()}.
 
 %% @type exec_result() =
 %%   {exit, Code :: integer()} | {signal, Name :: string()}.
@@ -66,34 +64,19 @@ terminate(nostate = _State) ->
 %% @doc Execute command on remote host.
 %%   Complex command (list of strings) is simply joined with spaces.
 %%
-%%   SSH port defaults to 22.
-%%
 %% @see init/1
 %% @see terminate/1
 %%
 %% @spec execute(hostname(), gen_lpssh_call:command(), optlist(), term()) ->
 %%   {ok, exec_result()} | skip_error | {error, Reason}
 
-execute(Host, Command, Opts, State) ->
-  execute(Host, default, Command, Opts, State).
-
-%% @doc Execute command on remote host.
-%%   Complex command (list of strings) is simply joined with spaces.
-%%
-%%   SSH port defaults to 22.
-%%
-%% @see init/1
-%% @see terminate/1
-%%
-%% @spec execute(hostname(), portnum(), gen_lpssh_call:command(),
-%%               optlist(), term()) ->
-%%   {ok, exec_result()} | skip_error | {error, Reason}
-
-execute(Host, default, Command, Opts, State) ->
-  execute(Host, 22, Command, Opts, State);
-execute(Host, Port, [C | _Rest] = Command, Opts, State) when is_list(C) ->
-  execute(Host, Port, string:join(Command, " "), Opts, State);
-execute(Host, Port, Command, Opts, nostate = _State) ->
+execute(HostSpec, [C | _Rest] = Command, Opts, State) when is_list(C) ->
+  execute(HostSpec, string:join(Command, " "), Opts, State);
+execute(HostSpec, Command, Opts, nostate = _State) ->
+  case string:tokens(HostSpec, ":") of
+    [Host]          -> Port = 22;
+    [Host, PortStr] -> Port = list_to_integer(PortStr)
+  end,
   case ssh_connect(Host, Port, Opts) of
     {ok, Conn} ->
       ExecResult = ssh_execute(Conn, Command, Opts),
