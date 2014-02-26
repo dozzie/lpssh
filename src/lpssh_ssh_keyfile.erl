@@ -20,8 +20,7 @@
 %%% private key
 %%%---------------------------------------------------------------------------
 
-%% @doc Load user's private DSA key for authentication.
-%%   Typically, the key is stored in `~/.ssh/id_dsa' file.
+%% @doc Load host's private DSA key (not used for user authentication).
 %%
 %% @spec private_host_dsa_key(system | user | {remoteuser, User}, list()) ->
 %%   {ok, SSHKey} | {error, Reason}
@@ -29,8 +28,7 @@
 private_host_dsa_key(Type, Opts) ->
   ssh_file:private_host_dsa_key(Type, Opts).
 
-%% @doc Load user's private RSA key for authentication.
-%%   Typically, the key is stored in `~/.ssh/id_rsa' file.
+%% @doc Load host's private RSA key (not used for user authentication).
 %%
 %% @spec private_host_rsa_key(system | user | {remoteuser, User}, list()) ->
 %%   {ok, SSHKey} | {error, Reason}
@@ -46,6 +44,9 @@ private_host_rsa_key(Type, Opts) ->
 %%
 %%   `Alg' is either `"ssh-dss"' or `"ssh-rsa"'.
 %%
+%%   Function should return `{error,not_found}' when no public key for the
+%%   host was found.
+%%
 %% @spec lookup_host_key(string(), string(), list()) ->
 %%   {ok, SSHKey :: term()} | {error, Reason}
 
@@ -53,6 +54,7 @@ lookup_host_key(Host, Alg, Opts) ->
   ssh_file:lookup_host_key(Host, Alg, Opts).
 
 %% @doc Add host's public key to `known_hosts' file.
+%%
 %% @spec add_host_key(string(), term(), list()) ->
 %%   ok | {error, Reason}
 
