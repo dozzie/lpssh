@@ -95,12 +95,62 @@ main(Args) ->
 
 %%----------------------------------------------------------------------------
 
-do_work(_O = #opts{}, {_Opts, _Sections} = _Config) ->
+do_work(CommandLine = #opts{hosts = HostList, command = Command}, Config) ->
+  Options = combine_options(CommandLine, Config),
+
   %error_logger:add_report_handler(lpssh_exec_status_h, group_leader()),
-  %lpssh:run(hostlist_mod(), call_mod(), exec_command()),
-  %lpssh:run(hostlist_mod(), call_mod(), Query, exec_command()),
-  io:fwrite("This is a stub for real work function~n"),
+
+  % TODO: use errors for something?
+  case HostList of
+    all ->
+      HostListMod = list_to_atom(proplists:get_value(inventory, Options)),
+      CallMod     = list_to_atom(proplists:get_value(call,      Options)),
+      io:fwrite("lpssh:run(~p, ~p, ~p)~n", [HostListMod, CallMod, Command]);
+      %lpssh:run(HostListMod, CallMod, Command);
+    {q, Query} ->
+      HostListMod = list_to_atom(proplists:get_value(inventory, Options)),
+      CallMod     = list_to_atom(proplists:get_value(call,      Options)),
+      io:fwrite("lpssh:run(~p, ~p, ~p, ~p)~n", [HostListMod, CallMod, Query, Command]);
+      %lpssh:run(HostListMod, CallMod, Query, Command);
+    {hosts, Hosts} ->
+      CallMod = list_to_atom(proplists:get_value(call, Options)),
+      io:fwrite("lpssh:run(~p, ~p, ~p)~n", [Hosts, CallMod, Command])
+      %lpssh:run(Hosts, CallMod, Command)
+  end,
+
   ok.
+
+combine_options(CmdLine = #opts{}, {DefaultConfigOpts, Sections} = _Config) ->
+  #opts{
+    group   = Group,
+    options = CommandLineOpts,
+    inventory_plugin = InventoryPlugin,
+    call_plugin      = CallPlugin
+  } = CmdLine,
+
+  Section = case Group of
+    default ->
+      SectionName = proplists:get_value(default_group, DefaultConfigOpts),
+      proplists:get_value(list_to_atom(SectionName), Sections, []);
+    SectionName ->
+      proplists:get_value(list_to_atom(SectionName), Sections, [])
+  end,
+
+  InventoryOverrideOpt = if
+    InventoryPlugin == undefined -> [];
+    is_list(InventoryPlugin)     -> [{inventory, InventoryPlugin}]
+  end,
+  CallOverrideOpt = if
+    CallPlugin == undefined -> [];
+    is_list(CallPlugin)     -> [{call, CallPlugin}]
+  end,
+
+  % first: command line (--inventory, --call and other flags)
+  % then: options retrieved from specified section
+  % last: options set in config outside the sections (before the first one)
+  Options = InventoryOverrideOpt ++ CallOverrideOpt ++ CommandLineOpts ++
+            Section ++ DefaultConfigOpts,
+  Options.
 
 %%----------------------------------------------------------------------------
 %% options(Opts) {{{
