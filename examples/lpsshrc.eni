@@ -1,0 +1,15 @@
+plugins_path  = /etc/lpssh/plugins
+default_group = devel-servers
+call = lpssh_call_ssh
+
+[devel-servers]
+inventory = cfreport
+# excessive because of default defined above
+call = lpssh_call_ssh
+cfreport_address = http://cfmaster.example.net/cfreport
+
+[admin-servers]
+inventory = flat_file
+inventory_file = /etc/lpssh/admin_servers.txt
+
+# vim:ft=dosini

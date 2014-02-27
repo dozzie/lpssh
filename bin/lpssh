@@ -1,0 +1,192 @@
+#!/usr/bin/escript
+%%! -pz ebin
+%%
+%% Late parallel SSH client.
+%%
+%% Usage examples:
+%%   lpssh --all               command --opt1 --opt2=param arg1 arg2 ...
+%%   lpssh --hosts A,B,C,...   command ...
+%%   lpssh --query '^wr.*1..$' command ...
+%%
+%% Other options:
+%%   --config=~/.lpsshrc
+%%       Configuration file. Contains default options, host groups definitions
+%%       and so on.
+%%
+%%   --group=admin-servers
+%%       Which host group to choose.
+%%
+%%   --inventory=lpssh_hostlist_exec
+%%       Inventory plugin.
+%%
+%%   --call=lpssh_call_ssh
+%%       Call plugin.
+%%
+%% Example lpsshrc:
+%% ```
+%% plugins_path  = /etc/lpssh/plugins
+%% default_group = devel-servers
+%% call = lpssh_call_ssh
+%%
+%% [devel-servers]
+%% inventory = cfreport
+%% # excessive because of default defined above
+%% call = lpssh_call_ssh
+%% cfreport_address = http://cfmaster.example.net/cfreport
+%%
+%% [admin-servers]
+%% inventory = flat_file
+%% inventory_file = /etc/lpssh/admin_servers.txt
+%% '''
+%%
+%%----------------------------------------------------------------------------
+
+-record(opts, {
+  hosts   = undefined,          % all | {hosts,[...]} | {q,"..."}
+  command = undefined,          % string() | [string()]
+  group   = default,            % string()
+  inventory_plugin = undefined, % string()
+  call_plugin      = undefined, % string()
+  config_file = "~/.lpsshrc",
+  options = []  % {atom(), string()} ("--foo=bar") | atom() ("--foo")
+}).
+
+%%----------------------------------------------------------------------------
+
+main(["-h"]) -> main(["--help"]);
+main(["--help"]) ->
+  io:fwrite("Usage:~n", []),
+  S = lists:last(string:tokens(escript:script_name(), "/")),
+  io:fwrite("  ~s [options] --all          command [args ...]~n", [S]),
+  io:fwrite("  ~s [options] --hosts H1,... command [args ...]~n", [S]),
+  io:fwrite("  ~s [options] --query '...'  command [args ...]~n", [S]),
+  % TODO: other options
+  %   --inventory=...
+  %   --call=...
+  %   --config=~/.lpsshrc
+  %   --group=...
+  ok;
+
+main(Args) ->
+  O = options(Args),
+
+  case O of
+    #opts{hosts = undefined, command = undefined} ->
+      io:fwrite("Neither hosts nor command specified~n"),
+      main(["--help"]),
+      halt(1);
+    #opts{command = undefined} ->
+      io:fwrite("No command specified~n"),
+      main(["--help"]),
+      halt(1);
+    #opts{hosts = undefined} ->
+      io:fwrite("No hosts specified~n"),
+      main(["--help"]),
+      halt(1);
+    _ ->
+      Config = case eni:file(tilde_expand(O#opts.config_file)) of
+        {error,enoent} -> {[],[]};
+        {error,eacces} -> {[],[]};
+        {ok, C} -> C
+      end,
+      do_work(O, Config)
+  end,
+  ok.
+
+%%----------------------------------------------------------------------------
+
+do_work(_O = #opts{}, {_Opts, _Sections} = _Config) ->
+  %error_logger:add_report_handler(lpssh_exec_status_h, group_leader()),
+  %lpssh:run(hostlist_mod(), call_mod(), exec_command()),
+  %lpssh:run(hostlist_mod(), call_mod(), Query, exec_command()),
+  io:fwrite("This is a stub for real work function~n"),
+  ok.
+
+%%----------------------------------------------------------------------------
+%% options(Opts) {{{
+
+options([]) ->
+  #opts{};
+
+%% `-X' aliases
+options(["-a" | Rest]) ->
+  options(["--all" | Rest]);
+options(["-q", Query | Rest]) ->
+  options(["--query", Query | Rest]);
+
+options(["--all" | Rest]) ->
+  Opts = options(Rest),
+  Opts#opts{hosts = all};
+
+options(["--query", Query | Rest]) ->
+  Opts = options(Rest),
+  Opts#opts{hosts = {q,Query}};
+options(["--query=" ++ Query | Rest]) ->
+  options(["--query", Query | Rest]);
+
+options(["--hosts", HostList | Rest]) ->
+  Opts = options(Rest),
+  Opts#opts{hosts = {hosts,string:tokens(HostList, ",; \n")}};
+options(["--hosts=" ++ HostList | Rest]) ->
+  options(["--hosts", HostList | Rest]);
+
+options(["--inventory", Plugin | Rest]) ->
+  Opts = options(Rest),
+  Opts#opts{inventory_plugin = Plugin};
+options(["--inventory=" ++ Plugin | Rest]) ->
+  options(["--inventory", Plugin | Rest]);
+
+options(["--call", Plugin | Rest]) ->
+  Opts = options(Rest),
+  Opts#opts{call_plugin = Plugin};
+options(["--call=" ++ Plugin | Rest]) ->
+  options(["--call", Plugin | Rest]);
+
+options(["--config", File | Rest]) ->
+  Opts = options(Rest),
+  Opts#opts{config_file = File};
+options(["--config=" ++ File | Rest]) ->
+  options(["--config", File | Rest]);
+
+options(["--group", Group | Rest]) ->
+  Opts = options(Rest),
+  Opts#opts{group = Group};
+options(["--group=" ++ Group | Rest]) ->
+  options(["--group", Group | Rest]);
+
+%% --Any, --Name=Value
+options(["--" ++ Opt | Rest]) when length(Opt) > 0 ->
+  Options = options(Rest),
+  NewOpt = case string:chr(Opt, $=) of
+    0   -> list_to_atom(Opt);
+    Pos ->
+      Name  = string:substr(Opt, 1, Pos - 1),
+      Value = string:substr(Opt, Pos + 1),
+      {list_to_atom(Name), Value}
+  end,
+  Options#opts{options = [NewOpt | Options#opts.options]};
+
+%% end-of-options
+options(["--", Command]) ->
+  #opts{command = Command};
+options(["--" | Rest]) ->
+  #opts{command = Rest};
+
+%% command
+options([Command]) ->
+  #opts{command = Command};
+options(Rest) ->
+  #opts{command = Rest}.
+
+%% }}}
+%%----------------------------------------------------------------------------
+%% tilde_expand(Path) {{{
+
+tilde_expand("~/" ++ Path) ->
+  os:getenv("HOME") ++ "/" ++ Path;
+tilde_expand(Path) ->
+  Path.
+
+%% }}}
+%%----------------------------------------------------------------------------
+%% vim:ft=erlang:foldmethod=marker
