@@ -214,12 +214,13 @@ options(["--group=" ++ Group | Rest]) ->
 %% --Any, --Name=Value
 options(["--" ++ Opt | Rest]) when length(Opt) > 0 ->
   Options = options(Rest),
+  DashToUnderscore = fun($-) -> $_; (C) -> C end,
   NewOpt = case string:chr(Opt, $=) of
-    0   -> list_to_atom(Opt);
+    0   -> list_to_atom(lists:map(DashToUnderscore, Opt));
     Pos ->
       Name  = string:substr(Opt, 1, Pos - 1),
       Value = string:substr(Opt, Pos + 1),
-      {list_to_atom(Name), Value}
+      {list_to_atom(lists:map(DashToUnderscore, Name)), Value}
   end,
   Options#opts{options = [NewOpt | Options#opts.options]};
 
