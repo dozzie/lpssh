@@ -19,7 +19,7 @@
 
 %%%---------------------------------------------------------------------------
 
--record(opts, {re_cmd = undefined, arg_cmd = undefined}).
+-record(opts, {command, query_style = regexp}).
 
 %%%---------------------------------------------------------------------------
 %%% gen_lpssh_hostlist API
@@ -43,10 +43,27 @@ dependencies() ->
 %% @spec init(term()) ->
 %%   {ok, State} | {error, Reason}
 
-init({re, Command} = _Args) ->
-  {ok, #opts{re_cmd = Command}};
-init({arg, Command} = _Args) ->
-  {ok, #opts{arg_cmd = Command}}.
+%init({re, Command} = _Args) ->
+%  {ok, #opts{re_cmd = Command}};
+%init({arg, Command} = _Args) ->
+%  {ok, #opts{arg_cmd = Command}}.
+init(Opts) ->
+  case proplists:get_value(inventory_command, Opts) of
+    undefined ->
+      {error, command_undefined};
+    Command ->
+      case proplists:get_value(query_style, Opts) of
+        undefined ->
+          % default one, which is regexp
+          {ok, #opts{command = Command}};
+        "regexp" ->
+          {ok, #opts{command = Command, query_style = regexp}};
+        "argument" ->
+          {ok, #opts{command = Command, query_style = argument}};
+        _Any ->
+          {error, badarg}
+      end
+  end.
 
 %% @doc Clean up on shutdown.
 %%
@@ -61,11 +78,7 @@ terminate(_State) ->
 %% @spec hosts(term()) ->
 %%   {ok, [string()]}
 
-hosts(_State = #opts{arg_cmd = Command, re_cmd = undefined}) ->
-  Output = os:cmd(Command),
-  Hosts = string:tokens(Output, "\r\n"),
-  {ok, Hosts};
-hosts(_State = #opts{re_cmd = Command, arg_cmd = undefined}) ->
+hosts(_State = #opts{command = Command}) ->
   Output = os:cmd(Command),
   Hosts = string:tokens(Output, "\r\n"),
   {ok, Hosts}.
@@ -77,11 +90,11 @@ hosts(_State = #opts{re_cmd = Command, arg_cmd = undefined}) ->
 %% @spec hosts(string(), term()) ->
 %%   {ok, [string()]}
 
-hosts(Query, _State = #opts{arg_cmd = Command, re_cmd = undefined}) ->
+hosts(Query, _State = #opts{command = Command, query_style = argument}) ->
   Output = os:cmd(Command ++ " " ++ Query),
   Hosts = string:tokens(Output, "\r\n"),
   {ok, Hosts};
-hosts(Query, _State = #opts{re_cmd = Command, arg_cmd = undefined}) ->
+hosts(Query, _State = #opts{command = Command, query_style = regexp}) ->
   % TODO: handle pattern errors
   {ok, Re} = re:compile(Query),
   Output = os:cmd(Command),
