@@ -130,9 +130,16 @@ combine_options(CmdLine = #opts{}, {DefaultConfigOpts, Sections} = _Config) ->
 
   Section = case Group of
     default ->
-      SectionName = proplists:get_value(default_group, DefaultConfigOpts),
-      proplists:get_value(list_to_atom(SectionName), Sections, []);
-    SectionName ->
+      case proplists:get_value(default_group, DefaultConfigOpts) of
+        undefined ->
+          % no default group defined
+          [];
+        SectionName when is_list(SectionName) ->
+          % default group defined, but may be missing in config
+          proplists:get_value(list_to_atom(SectionName), Sections, [])
+      end;
+    SectionName when is_list(SectionName) ->
+      % group specified, but may be missing in config
       proplists:get_value(list_to_atom(SectionName), Sections, [])
   end,
 
