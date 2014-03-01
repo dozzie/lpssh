@@ -1,0 +1,14 @@
+== lpssh ==
+
+lpssh is a late parallel SSH client written in Erlang.
+
+Why another parallel SSH client? Because of *massive* parallelism of Erlang.
+It can complete call to 800 servers under 50 seconds with no noticeable load
+on caller host.
+
+Another thing is that lpssh uses notion of hosts inventory. Most of other
+tools out there only allow to specify each host in command line.
+lpssh provides a way of listing hosts known by some inventory, be it an
+application, flat file or a shell command. You provide a query understood by
+underlying inventory and lpssh calls each of the listed hosts. Of course, you
+can still provide hosts by their names.
