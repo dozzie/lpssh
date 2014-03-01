@@ -1,0 +1,9 @@
+  * xmerlrpc call
+  * lpssh_call_ssh:
+    * remember known hosts
+    * different key (tmpfile?)
+  * behaviour documentation
+  * --help support for plugins
+  * plugin path and plugins conventions(?)
+  * "max_calls = 512" option
+    * sleep+retry on {error,emfile}?
