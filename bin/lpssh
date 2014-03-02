@@ -16,22 +16,25 @@
 %%   --group=admin-servers
 %%       Which host group to choose.
 %%
-%%   --inventory=lpssh_hostlist_exec
+%%   --inventory=exec
 %%       Inventory plugin.
 %%
-%%   --call=lpssh_call_ssh
+%%   --call=ssh
 %%       Call plugin.
+%%
+%%   --plugins-path=directory
+%%       Directory containing additional plugins (call and inventory).
 %%
 %% Example lpsshrc:
 %% ```
 %% plugins_path  = /etc/lpssh/plugins
 %% default_group = devel-servers
-%% call = lpssh_call_ssh
+%% call = ssh
 %%
 %% [devel-servers]
 %% inventory = cfreport
 %% # excessive because of default defined above
-%% call = lpssh_call_ssh
+%% call = ssh
 %% cfreport_address = http://cfmaster.example.net/cfreport
 %%
 %% [admin-servers]
@@ -65,6 +68,7 @@ main(["--help"]) ->
   %   --call=...
   %   --config=~/.lpsshrc
   %   --group=...
+  %   --plugins-path=...
   ok;
 
 main(Args) ->
@@ -97,21 +101,31 @@ main(Args) ->
 
 do_work(CommandLine = #opts{hosts = HostList, command = Command}, Config) ->
   Options = combine_options(CommandLine, Config),
+  {HostListPlugins, CallPlugins} =
+    case proplists:get_value(plugins_path, Options) of
+      undefined  -> lpssh:load_plugins(builtin);
+      PluginsDir -> lpssh:load_plugins(PluginsDir)
+    end,
 
   error_logger:add_report_handler(lpssh_exec_status_h, group_leader()),
 
   % TODO: use errors for something?
   case HostList of
     all ->
-      HostListMod = list_to_atom(proplists:get_value(inventory, Options)),
-      CallMod     = list_to_atom(proplists:get_value(call,      Options)),
+      HostListPlugin = proplists:get_value(inventory, Options),
+      CallPlugin     = proplists:get_value(call,      Options),
+      HostListMod = proplists:get_value(HostListPlugin, HostListPlugins),
+      CallMod     = proplists:get_value(CallPlugin,     CallPlugins),
       lpssh:run({HostListMod,Options}, {CallMod,Options}, Command);
     {q, Query} ->
-      HostListMod = list_to_atom(proplists:get_value(inventory, Options)),
-      CallMod     = list_to_atom(proplists:get_value(call,      Options)),
+      HostListPlugin = proplists:get_value(inventory, Options),
+      CallPlugin     = proplists:get_value(call,      Options),
+      HostListMod = proplists:get_value(HostListPlugin, HostListPlugins),
+      CallMod     = proplists:get_value(CallPlugin,     CallPlugins),
       lpssh:run({HostListMod,Options}, {CallMod,Options}, Query, Command);
     {hosts, Hosts} ->
-      CallMod = list_to_atom(proplists:get_value(call, Options)),
+      CallPlugin = proplists:get_value(call, Options),
+      CallMod = proplists:get_value(CallPlugin, CallPlugins),
       lpssh:run(Hosts, {CallMod,Options}, Command)
   end,
 
