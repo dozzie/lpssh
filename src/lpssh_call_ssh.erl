@@ -10,6 +10,7 @@
 %% gen_lpssh_call API
 -export([execute/4]).
 -export([dependencies/0, init/1, terminate/1]).
+-export([name/0]).
 -export([format_error/1]).
 
 %% SSH convenience wrappers (maybe somebody will find it useful)
@@ -30,6 +31,14 @@
 %%%---------------------------------------------------------------------------
 %%% gen_lpssh_call API
 %%%---------------------------------------------------------------------------
+
+%% @doc Return name and type of this plugin.
+%%
+%% @spec name() ->
+%%   {string(), call | inventory}
+
+name() ->
+  {"ssh", call}.
 
 %% @doc Return list of applications that need to be started to use this
 %%   module.

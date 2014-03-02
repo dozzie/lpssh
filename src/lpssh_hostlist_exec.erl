@@ -12,6 +12,7 @@
 %% gen_lpssh_hostlist API
 -export([hosts/1, hosts/2]).
 -export([dependencies/0, init/1, terminate/1]).
+-export([name/0]).
 -export([format_error/1]).
 
 %% development
@@ -24,6 +25,14 @@
 %%%---------------------------------------------------------------------------
 %%% gen_lpssh_hostlist API
 %%%---------------------------------------------------------------------------
+
+%% @doc Return name and type of this plugin.
+%%
+%% @spec name() ->
+%%   {string(), call | inventory}
+
+name() ->
+  {"exec", inventory}.
 
 %% @doc Return list of applications that need to be started to use this
 %%   module.
