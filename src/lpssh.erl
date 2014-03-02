@@ -224,18 +224,24 @@ start_rec(App) ->
 %%   Function returns names ({@type string()}) of available plugins mapped to
 %%   their module names.
 %%
-%% @spec load_plugins(string()) ->
+%% @spec load_plugins(string() | builtin) ->
 %%   {InventoryPlugins :: [{string(), atom()}],
 %%     CallPlugins :: [{string(), atom()}]}
+
+load_plugins(builtin = _PluginsDir) ->
+  % default, built-in plugins
+  BuiltInInventoryPlugins = [{"exec", lpssh_hostlist_exec}],
+  BuiltInCallPlugins      = [{"ssh", lpssh_call_ssh}],
+  {BuiltInInventoryPlugins, BuiltInCallPlugins};
 
 load_plugins(PluginsDir) ->
   AllPlugins = [plugin(F) || F <- beam_files(PluginsDir)],
 
-  BuiltInInventoryPlugins = [{"exec", lpssh_hostlist_exec}],
-  BuiltInCallPlugins      = [{"ssh", lpssh_call_ssh}],
-
   InventoryPlugins = [Mapping || {inventory, Mapping} <- AllPlugins],
   CallPlugins      = [Mapping || {call,      Mapping} <- AllPlugins],
+
+  % return loaded plugins along with built-in ones
+  {BuiltInInventoryPlugins, BuiltInCallPlugins} = load_plugins(builtin),
   {InventoryPlugins ++ BuiltInInventoryPlugins,
     CallPlugins ++ BuiltInCallPlugins}.
 
