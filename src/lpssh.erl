@@ -6,9 +6,12 @@
 
 -module(lpssh).
 
-%% public API
+%% calling remote hosts
 -export([run/3, run/4]).
+%% loading plugins
+-export([load_plugins/1]).
 
+%% internal API (for spawn_monitor/3)
 -export([execute/5]).
 
 %%%---------------------------------------------------------------------------
@@ -204,6 +207,94 @@ start_rec(App) ->
     {error,_Reason} = Error ->
       Error
   end.
+
+%% }}}
+%%----------------------------------------------------------
+
+%%%---------------------------------------------------------------------------
+%%% loading plugins
+%%%---------------------------------------------------------------------------
+
+%%----------------------------------------------------------
+%% load_plugins(Dir) {{{
+
+%% @doc Load all known plugins from specified directory.
+%%   Plugins must be already compiled (`*.beam' files).
+%%
+%%   Function returns names ({@type string()}) of available plugins mapped to
+%%   their module names.
+%%
+%% @spec load_plugins(string()) ->
+%%   {InventoryPlugins :: [{string(), atom()}],
+%%     CallPlugins :: [{string(), atom()}]}
+
+load_plugins(PluginsDir) ->
+  AllPlugins = [plugin(F) || F <- beam_files(PluginsDir)],
+
+  BuiltInInventoryPlugins = [{"exec", lpssh_hostlist_exec}],
+  BuiltInCallPlugins      = [{"ssh", lpssh_call_ssh}],
+
+  InventoryPlugins = [Mapping || {inventory, Mapping} <- AllPlugins],
+  CallPlugins      = [Mapping || {call,      Mapping} <- AllPlugins],
+  {InventoryPlugins ++ BuiltInInventoryPlugins,
+    CallPlugins ++ BuiltInCallPlugins}.
+
+%% @doc Load `*.beam' file and check what type of plugin it is.
+%%
+%% @spec plugin(string()) ->
+%%     {call,      {PluginName :: string(), Module :: atom()}}
+%%   | {inventory, {PluginName :: string(), Module :: atom()}}
+%%   | not_plugin
+
+%% }}}
+%%----------------------------------------------------------
+%% plugin("*.beam") {{{
+
+plugin(File) ->
+  FileNoExt = string:substr(File, 1, length(File) - 5), % strip ".beam"
+  % TODO: handle errors
+  {module, Module} = code:load_abs(FileNoExt),
+  try Module:name() of
+    {Name, inventory} -> {inventory, {Name, Module}};
+    {Name, call}      -> {call,      {Name, Module}};
+    _A ->
+      io:fwrite("no match (~p): ~p~n", [File, _A]),
+      not_plugin
+  catch
+    error:undef ->
+      io:fwrite("error:undef (~p)~n", [File]),
+      not_plugin
+  end.
+
+%% }}}
+%%----------------------------------------------------------
+%% beam_files(Dir) {{{
+
+%% @doc List `*.beam' files located in a directory.
+%%
+%% @spec beam_files(string()) ->
+%%   [string()]
+
+beam_files(Directory) ->
+  % TODO: handle errors
+  {ok, Files} = file:list_dir(Directory),
+  [Directory ++ "/" ++ F || F <- Files, ends_with(F, ".beam")].
+
+%% }}}
+%%----------------------------------------------------------
+%% ends_with(String,Ending) {{{
+
+%% @doc Check whether string ends with another string or not.
+%%
+%% @spec ends_with(string(), string()) ->
+%%   bool()
+
+ends_with(Ending = _String, Ending) ->
+  true;
+ends_with([] = _String, _Ending) ->
+  false;
+ends_with([_ | Rest] = _String, Ending) ->
+  ends_with(Rest, Ending).
 
 %% }}}
 %%----------------------------------------------------------
